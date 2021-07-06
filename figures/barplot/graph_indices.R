@@ -48,7 +48,7 @@ ggplot(df, aes(x=x, y=y, fill=color)) +
 
 #-------------------------------------------------------------------------------------------------
 
-#modularidad
+#modularity
 color <- rep(c("Invaded area","Native area"), each = 4)
 x <- rep(c("Whole","Actively transmitted","Passively transmitted","Ectoparasites"),times = 2)
 y <- c(29.2585, 20.99315, 14.75034, 17.58154,

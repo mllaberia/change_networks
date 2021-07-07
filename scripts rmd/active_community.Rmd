@@ -1,0 +1,308 @@
+---
+title: "Code for the calculation of bipartite network metrics in the actively transmitted parasite community of Planiliza haematocheilus for the Sea of Azov and Sea of Japan"
+author: "Mar Llaberia-Robledillo, Juan A. Balbuena, Volodimir Sarabeev, Cristina Llopis-Belenguer"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, fig.width = 15, 
+                      fig.align = "center")
+
+```
+
+# Libraries
+Load the libraries required.
+```{r libraries}
+library(bipartite)
+library(parallel)
+
+```
+# Data
+## Set a working directory
+Optional but very useful step when you are working with multiple data files. It allows you to call files without writing their path, in addition to allowing data to be stored in the same folder, the working directory.
+```{r}
+setwd("~/Desktop/Planiliza haematocheilus (Lh)/active")
+```
+
+## Host-parasite abundance data
+The main data necessary for the analysis belongs to a database of helminth parasites of the grey mullets (see main text for description). First, we edit the matrices separating those P. haematocheilus individuals belonging to the Sea of Azov - Black Sea and those belonging to the Sea of Japan. Second, we eliminate those data that are not necessary for our study (date, season, sex, etc.). Third, the data are divided according to the transmission strategy of the parasite species: ectoparasites, actively transmitted parasites, trophically transmitted parasites and finally, the whole community. 
+This code shows the actively transmitted parasite community analysis. We upload the host-parasite abundance matrices once arranged.
+```{r matrices}
+azov_active<- read.table("azov_active.txt", header = T, row.names = 1)
+japan_active<- read.table("japan_active.txt", header = T, row.names = 1)
+
+```
+
+## Real values of the Azov and Japan networks
+We calculated three indices: connectance (C)(Dunne et al. 2002), weighted nesting based on overlap and decreasing fill (WNODF) (Almeida-Neto and Ulrich 2011), and modularity (Q) (Newman and Girvan 2004). The first two are calculated with a function (networklevel), while the third with another function (computeModules).In addition, we add a time calculator to determine the computation time needed later.
+```{r real_values, message=FALSE, include=FALSE}
+
+## SEA OF AZOV 
+t <- proc.time()
+network_active_azov <- networklevel(azov_active, index = c("connectance", "weighted NODF"))
+modularity_active_azov <- computeModules(azov_active)@likelihood
+proc.time()-t
+
+# join the values of the indices in the same object
+index_active_azov <- data.frame((t(network_active_azov)), modularity_active_azov)
+# (optional) save the results
+# write.csv2(index_active_azov,file = "realvalues_azov.csv", row.names = FALSE)
+
+## SEA OF JAPAN
+t <- proc.time()
+network_active_japan <- networklevel(japan_active, index = c("connectance", "weighted NODF"))
+modularity_active_japan <- computeModules(japan_active)@likelihood
+proc.time()-t
+
+# join the values of the indices in the same object
+index_active_japan <- data.frame((t(data.frame(network_active_japan))), modularity_active_japan)
+# (optional) save the results
+# write.csv2(index_active_japan,file = "realvalues_japan.csv")
+```
+
+### Bootstrap values
+We generate 1,000 random networks from each matrix with replacement (row based bootstrap) and a fixed number of individuals. Then, we calculate the values of the indices for each of the replicated networks.
+```{r bootstraop, message=FALSE, include=FALSE}
+
+## SEA OF AZOV
+t <- proc.time()
+# bootstrap funciton
+bootSxSP <- function (azov_active) {
+  a <- sample(seq_len(nrow(azov_active)), nrow(azov_active), replace = TRUE)
+  azov_active <- azov_active[a, ]
+  return(azov_active)
+}
+A_R <- replicate(1000, bootSxSP(azov_active), simplify = FALSE)
+
+# calculation of index values for bootstrap results
+cores <- detectCores()
+cl <- makeForkCluster(32)
+netlevelazov <- parSapply(cl, A_R, function(x) networklevel (x, index = c("connectance", "weighted NODF")))
+modularity_azov<- parSapply(cl, A_R, function(x)computeModules(x)@likelihood)
+stopCluster(cl)
+proc.time()-t
+
+# join the values of the indices in the same object
+boot_active_azov <- data.frame(t(netlevelazov), modularity_azov)
+# save the results 
+write.csv2(boot_active_azov, file = "bootnet_active_azov.csv", row.names = FALSE)
+
+
+## SEA OF JAPAN
+t <- proc.time()
+# bootstrap funciton
+bootSxSP <- function (japan_active) {
+  a <- sample(seq_len(nrow(japan_active)), nrow(japan_active), replace = TRUE)
+  japan_active <- japan_active[a, ]
+  return(japan_active)
+}
+A_R <- replicate(1000, bootSxSP(japan_active), simplify = FALSE)
+
+# calculation of index values for bootstrap results
+cores <- detectCores()
+cl <- makeForkCluster(32)
+netleveljapan <- parSapply(cl, A_R, function(x) networklevel (x, index = c("connectance", "weighted NODF")))
+modularity_japan<- parSapply(cl, A_R, function(x)computeModules(x)@likelihood)
+stopCluster()
+proc.time()-t
+
+# join the values of the indices in the same object
+boot_active_japan <- data.frame((t(data.frame(netleveljapan))), modularity_japan)
+# (optional) save the results 
+write.csv2(boot_active_japan, file = "bootnet_active_japan.csv", row.names = FALSE)
+```
+
+### Nullmodel values 
+We generate 1,000 replicas of the network matrices with the null.model function, and with the swap.web and vaznull algorithms. Then, we calculate the values of the indices for each of the generated networks.
+```{r nullmodel, message=FALSE, include=FALSE}
+
+## SEA OF AZOV
+t <- proc.time()
+## with swap.web algorithm (for WNDOF and Q)
+nullazov_active_swap <- nullmodel(azov_active, N=1000, method = 2) #method 2/"swap.web"
+## with vaznull algorithm (for WNODF only) it is not loaded here because of the time it takes.
+#nullazov_active_vaz <- nullmodel(azov_active, N=1000, method = 3) #method 3/"vaznull"
+
+cores <- detectCores()
+cl <- makeForkCluster(32)
+null_netlevelazov_s <- parSapply(cl, nullazov_active_swap, function(x) networklevel (x, index = c("weighted NODF")))
+null_modularazov_s <-parSapply(cl, nullazov_active_swap, function(x) computeModules(x)@likelihood)
+#null_netlevelazov_v <- parSapply(cl, nullazov_active_vaz, function(x) networklevel (x, index = c("weighted NODF")))
+stopCluster(cl)
+proc.time()-t
+
+# join the values of the indices in the same object
+null_swap_active_azov <- data.frame(data.frame(null_netlevelazov_s), null_modularazov_s)
+#null_vaz_active_azov <- data.frame(data.frame(null_netlevelazov_v), null_modularazov_s)
+
+# (optional) save the results 
+#write.csv2(null_swap_active_azov, file = "null_swap_active_azov.csv", row.names = FALSE)
+#write.csv2(null_vaz_active_azov, file = "null_vaz_active_azov.csv", row.names = FALSE)
+
+
+## SEA OF JAPAN
+t <- proc.time()
+## with swap.web algorithm (for WNDOF and modularity)
+nulljapan_active_swap <- nullmodel(japan_active, N=1000, method = 2) #method 2/"swap.web"
+## with vaznull algorithm (for WNODF only) it is not loaded here because of the time it takes.
+nulljapan_active_vaz <- nullmodel(japan_active, N=1000, method = 3) #method 3/"vaznull"
+
+cores <- detectCores()
+cl <- makeForkCluster(32)
+null_netleveljapan_s <- parSapply(cl, nulljapan_active_swap, function(x) networklevel (x, index = c("weighted NODF")))
+null_modularjapan_s <-parSapply(cl, nulljapan_active_swap, function(x) computeModules(x)@likelihood)
+#null_netleveljapan_v <- parSapply(cl, nulljapan_active_vaz, function(x) networklevel (x, index = c("weighted NODF")))
+stopCluster(cl)
+proc.time()-t
+
+# join the values of the indices in the same object
+null_swap_active_japan <- data.frame(data.frame(null_netleveljapan_s), null_modularjapan_s)
+#null_vaz_active_japan <- data.frame(data.frame(null_netleveljapan_v), null_modularjapan_s)
+
+# save the results 
+#write.csv2(null_swap_active_japan, file = "null_swap_active_japan.csv", row.names = FALSE)
+#write.csv2(null_vaz_active_japan, file = "null_vaz_active_japan.csv", row.names = FALSE)
+
+```
+
+## Standardize the real values of the network and the values of the null model
+We standardized the real values of the networks and the values obtained from the 1,000 bootstrap networks of the WNODF and Q indices.
+```{r}
+
+# SEA OF AZOV
+## WNODF values
+index_active_azov [,2] #real value
+boot_active_azov [,2] #bootstrap values 
+# formula to standardize the networks values
+stan_WNODF  <- function (x) {
+  mean <- mean(null_swap_active_azov[,1])
+  sd <- sd(null_swap_active_azov[,1])
+  y <- (x)
+  result <- (y-mean)/sd
+}
+a_w_value_wnodf <- sapply(index_active_azov[,2], stan_WNODF) #real standardized value 
+boot_stanWNODF_azov <- as.numeric(sapply(boot_active_azov[,2], stan_WNODF)) #bootstrap standardized values 
+#write.csv2(boot_stanWNODF_azov, file = "boot_stanWNODF_azov.csv")
+hist(boot_stanWNODF_azov)
+
+## Q VALUES 
+index_active_azov [,3] #real value
+boot_active_azov [,3] #bootstrap values 
+stan_Q  <- function (x) {
+  mean <- mean(null_swap_active_azov[,2])
+  sd <- sd(null_swap_active_azov[,2])
+  y <- (x)
+  result <- (y-mean)/sd
+}
+a_w_value_q <- sapply(index_active_azov[,3], stan_Q) #real standardized value 
+boot_stanQ_azov <- as.numeric(sapply(boot_active_azov[,3], stan_Q)) #bootstrap standardized values 
+#write.csv2(boot_stanQ_azov, file = "boot_stanQ_azov.csv")
+hist(boot_stanQ_azov)
+
+
+# SEA OF JAPAN 
+## WNODF VALUES
+index_active_japan [,2] #real value
+boot_active_japan [,2] #bootstrap values 
+stan_WNODF  <- function (x) {
+  mean <- mean(null_swap_active_japan[,1])
+  sd <- sd(null_swap_active_japan[,1])
+  y <- (x)
+  result <- (y-mean)/sd
+}
+j_w_value_wnodf <- sapply(index_active_japan[,2], stan_WNODF) #real standardized value 
+boot_stanWNODF_japan <- as.numeric(sapply(boot_active_japan[,2], stan_WNODF)) #bootstrap standardized values 
+#write.csv2(boot_stanWNODF_japan, file = "boot_stanWNODF_japan.csv")
+hist(boot_stanWNODF_japan)
+
+## Q VALUES 
+index_active_japan [,3] #real value
+boot_active_japan [,3] #bootstrap values
+stan_Q  <- function (x) {
+  mean <- mean(null_swap_active_japan[,2])
+  sd <- sd(null_swap_active_japan[,2])
+  y <- (x)
+  result <- (y-mean)/sd
+}
+j_w_value_q <- sapply(index_active_japan[,3], stan_Q) #real standardized value 
+boot_stanQ_japan <- as.numeric(sapply(boot_active_japan[,3], stan_Q)) #bootstrap standardized values 
+#write.csv2(boot_stanQ_japan, file = "boot_stanQ_japan.csv")
+hist(boot_stanQ_japan)
+
+```
+
+## Statistical analysis: MANN - WHITNEY TEST
+Statistical differences of the three indices between the native and invaded areas were tested by means of non-parametric Mann-Whitney-Wilcoxon tests.
+```{r test, message=FALSE}
+
+# C
+wilcox.test(index_active_azov[,1], index_active_japan[,1], conf.int = TRUE, conf.level = 0.95)
+# WNODF
+wilcox.test(null_swap_active_azov[,1], null_swap_active_japan[,1], conf.int = TRUE, conf.level = 0.95)
+# Q
+wilcox.test(null_swap_active_azov[,2], null_swap_active_japan[,2], conf.int = TRUE, conf.level = 0.95)
+
+
+```
+
+### Statistical metrics of the values of the indices of the Sea of Azov
+We collected the real value, mean, standard deviation, and 95% confidence intervals of the indices for both areas.
+```{r}
+
+# SEA OF AZOV
+## C VALUES 
+a_active_value_c <- index_active_azov[,1] #real value
+a_active_mean_c <- mean(boot_active_azov[,1])
+a_active_sd_c <- sd(boot_active_azov[,1])
+a_active_ci_c <- quantile(boot_active_azov[,1], c(0.025,0.975))
+
+## WNODF VALUES 
+a_active_value_wnodf <- sapply(index_active_azov[,2], stan_WNODF) #real standardized value 
+a_active_mean_wnodf <- mean(boot_stanWNODF_azov)
+a_active_sd_wnodf <- sd(boot_stanWNODF_azov)
+a_active_ci_wnodf <- quantile(boot_stanWNODF_azov, c(0.025,0.975))
+
+## Q VALUES 
+a_active_value_q <- sapply(index_active_azov[,3], stan_Q) #real standardized value
+a_active_mean_q <- mean(boot_stanQ_azov)
+a_active_sd_q <- sd(boot_stanQ_azov)
+a_active_ci_q <- quantile(boot_stanQ_azov, c(0.025,0.975))
+
+
+# SEA OF JAPAN 
+## C VALUES 
+j_active_value_c <- index_active_japan[,1] #real value
+j_active_mean_c <- mean(boot_active_japan[,1])
+j_active_sd_c <- sd(boot_active_japan[,1])
+j_active_ci_c <- quantile(boot_active_japan[,1], c(0.025,0.975))
+
+## WNODF VALUES 
+j_active_value_wnodf <- sapply(index_active_japan[,2], stan_WNODF) #real standardized value 
+j_active_mean_wnodf <- mean(boot_stanWNODF_japan)
+j_active_sd_wndof <- sd(boot_stanWNODF_japan)
+j_active_ci_wndof <- quantile(boot_stanWNODF_japan, c(0.025,0.975))
+
+## Q VALUES 
+j_active_value_q <- sapply(index_active_japan[,3], stan_Q) #real standardized value 
+j_active_mean_q <- mean(boot_stanQ_japan)
+j_active_sd_q <- sd(boot_stanQ_japan)
+j_active_ci_q <- quantile(boot_stanQ_japan, c(0.025,0.975))
+
+
+## Create a data frame with all the index results 
+
+a_active_connectance <- c(a_active_value_c, a_active_mean_c, a_active_sd_c, a_active_ci_c)
+j_active_connectance <- c(j_active_value_c, j_active_mean_c, j_active_sd_c, j_active_ci_c)
+
+a_active_wnodf <-c(a_active_value_wnodf, a_active_mean_wnodf, a_active_sd_wnodf, a_active_ci_wnodf)
+j_active_wnodf <-c(j_active_value_wnodf, j_active_mean_wnodf, j_active_sd_wnodf, j_active_ci_wnodf)
+
+a_active_q <-c(a_active_value_q, a_active_mean_q, a_active_sd_q, a_active_ci_q)
+j_active_q <- c(j_active_value_q, j_active_mean_q, j_active_sd_q, j_active_ci_q)
+
+active_values <- rbind(a_active_connectance, j_active_connectance, a_active_wnodf, j_active_wnodf, a_active_q, j_active_q)
+colnames(active_values) <- c("value", "mean", "sd", "ci_min", "ci_max")
+active_values
+
+```
+
+

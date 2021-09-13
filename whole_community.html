@@ -1069,31 +1069,31 @@ wilcox.test(index_whole_azov[,1], index_whole_japan[,1], conf.int = TRUE, conf.l
 ## difference in location 
 ##              -0.187954</code></pre>
 <pre class="r"><code># WNODF
-wilcox.test(null_swap_whole_azov[,1], null_swap_whole_japan[,1], conf.int = TRUE, conf.level = 0.95)</code></pre>
+wilcox.test(boot_stanWNODF_azov, boot_stanWNODF_japan, conf.int = TRUE, conf.level = 0.95)</code></pre>
 <pre><code>## 
 ##  Wilcoxon rank sum test with continuity correction
 ## 
-## data:  null_swap_whole_azov[, 1] and null_swap_whole_japan[, 1]
-## W = 0, p-value &lt; 2.2e-16
-## alternative hypothesis: true location shift is not equal to 0
-## 95 percent confidence interval:
-##  -22.49123 -22.27829
-## sample estimates:
-## difference in location 
-##              -22.38482</code></pre>
-<pre class="r"><code># Q
-wilcox.test(null_swap_whole_azov[,2], null_swap_whole_japan[,2], conf.int = TRUE, conf.level = 0.95)</code></pre>
-<pre><code>## 
-##  Wilcoxon rank sum test with continuity correction
-## 
-## data:  null_swap_whole_azov[, 2] and null_swap_whole_japan[, 2]
+## data:  boot_stanWNODF_azov and boot_stanWNODF_japan
 ## W = 1e+06, p-value &lt; 2.2e-16
 ## alternative hypothesis: true location shift is not equal to 0
 ## 95 percent confidence interval:
-##  0.2214178 0.2229046
+##  10.50341 10.72134
 ## sample estimates:
 ## difference in location 
-##              0.2221765</code></pre>
+##              10.61178</code></pre>
+<pre class="r"><code># Q
+wilcox.test(boot_stanQ_azov, boot_stanQ_japan, conf.int = TRUE, conf.level = 0.95)</code></pre>
+<pre><code>## 
+##  Wilcoxon rank sum test with continuity correction
+## 
+## data:   boot_stanQ_azov and boot_stanQ_japan
+## W = 164, p-value &lt; 2.2e-16
+## alternative hypothesis: true location shift is not equal to 0
+## 95 percent confidence interval:
+##  -22.40165 -21.57244
+## sample estimates:
+## difference in location 
+##             -21.98954</code></pre>
 <div id="statistical-metrics-of-the-values-of-the-indices-of-the-sea-of-azov" class="section level3">
 <h3>Statistical metrics of the values of the indices of the Sea of Azov</h3>
 <p>We collected the real value, mean, standard deviation, and 95% confidence intervals of the indices for both areas.</p>

@@ -245,11 +245,9 @@ Statistical differences of the three indices between the native and invaded area
 # C
 wilcox.test(index_pasive_azov[,1], index_pasive_japan[,1], conf.int = TRUE)
 # WNODF
-wilcox.test(null_swap_pasive_azov[,1], null_swap_pasive_japan[,1], conf.int = TRUE)
+wilcox.test(boot_stanWNODF_azov, boot_stanWNODF_japan, conf.int = TRUE, conf.level = 0.95)
 # Q
-wilcox.test(null_swap_pasive_azov[,2], null_swap_pasive_japan[,2], conf.int = TRUE)
-wilcox.test((quantile(boot_stanq_azov, c(0.025,0.975))),(quantile(boot_stanq_japan, c(0.025,0.975))))
-
+wilcox.test(boot_stanQ_azov, boot_stanQ_japan, conf.int = TRUE, conf.level = 0.95)
 
 ```
 
